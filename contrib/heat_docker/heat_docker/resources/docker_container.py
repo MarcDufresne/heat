@@ -54,13 +54,13 @@ class DockerContainer(resource.Resource):
         PRIVILEGED, TTY, OPEN_STDIN, STDIN_ONCE, ENV, CMD, DNS,
         IMAGE, VOLUMES, VOLUMES_FROM, PORT_BINDINGS, LINKS, NAME,
         RESTART_POLICY, CAP_ADD, CAP_DROP, READ_ONLY, CPU_SHARES,
-        DEVICES, CPU_SET
+        DEVICES, CPU_SET, REGISTRY_CREDENTIALS
     ) = (
         'docker_endpoint', 'hostname', 'user', 'memory', 'port_specs',
         'privileged', 'tty', 'open_stdin', 'stdin_once', 'env', 'cmd', 'dns',
         'image', 'volumes', 'volumes_from', 'port_bindings', 'links', 'name',
         'restart_policy', 'cap_add', 'cap_drop', 'read_only', 'cpu_shares',
-        'devices', 'cpu_set'
+        'devices', 'cpu_set', 'registry_credentials'
     )
 
     ATTRIBUTES = (
@@ -83,6 +83,12 @@ class DockerContainer(resource.Resource):
         PATH_ON_HOST, PATH_IN_CONTAINER, PERMISSIONS
     ) = (
         'path_on_host', 'path_in_container', 'permissions'
+    )
+
+    _REGISTRY_KEYS = (
+        REGISTRY, USERNAME, PASSWORD, EMAIL
+    ) = (
+        'registry', 'username', 'password', 'email'
     )
 
     _CAPABILITIES = ['SETPCAP', 'SYS_MODULE', 'SYS_RAWIO', 'SYS_PACCT',
@@ -295,6 +301,32 @@ class DockerContainer(resource.Resource):
               '(only supported for API version >= %s).') %
             MIN_API_VERSION_MAP['cpu_set'],
             support_status=support.SupportStatus(version='5.0.0'),
+        ),
+        REGISTRY_CREDENTIALS: properties.Schema(
+            properties.Schema.MAP,
+            _('Registry URL and credentials to pull the specified image'),
+            schema={
+                REGISTRY: properties.Schema(
+                    properties.Schema.STRING,
+                    _('URL of the registry'),
+                    default=''
+                ),
+                USERNAME: properties.Schema(
+                    properties.Schema.STRING,
+                    _('Username for the registry'),
+                    default=''
+                ),
+                PASSWORD: properties.Schema(
+                    properties.Schema.STRING,
+                    _('Password for the registry'),
+                    default=''
+                ),
+                EMAIL: properties.Schema(
+                    properties.Schema.STRING,
+                    _('Email associated to the registry user'),
+                    default=''
+                )
+            }
         )
     }
 
@@ -417,6 +449,19 @@ class DockerContainer(resource.Resource):
             'cpuset': self.properties[self.CPU_SET]
         }
         client = self.get_client()
+
+        registry_credentials = self.properties[self.REGISTRY_CREDENTIALS]
+
+        if registry_credentials:
+            registry_login_args = {
+                'username': registry_credentials[self.USERNAME],
+                'password': registry_credentials[self.PASSWORD],
+                'email': registry_credentials[self.EMAIL],
+                'registry': registry_credentials[self.REGISTRY],
+            }
+            if registry_login_args.get('registry'):
+                client.login(**registry_credentials)
+
         client.pull(self.properties[self.IMAGE])
         result = client.create_container(**create_args)
         container_id = result['Id']

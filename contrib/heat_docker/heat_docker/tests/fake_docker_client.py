@@ -118,3 +118,6 @@ class Client(object):
 
     def set_api_version(self, version):
         self.version_info['ApiVersion'] = version
+
+    def login(self, username, password, email, registry):
+        return True
