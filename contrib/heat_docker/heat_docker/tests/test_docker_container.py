@@ -112,6 +112,38 @@ class DockerContainerTest(common.HeatTestCase):
         self.assertEqual(['samalba/wordpress'], client.pulled_images)
         self.assertEqual('super-blog', client.container_create[0]['name'])
 
+    def test_create_with_registry_login(self):
+        t = template_format.parse(template)
+        self.stack = utils.parse_stack(t)
+        definition = self.stack.t.resource_definitions(self.stack)['Blog']
+        props = t['Resources']['Blog']['Properties'].copy()
+        registry = 'my-registry.example.com'
+        username = 'my-user'
+        password = 'p4ssw0rd'
+        email = 'my-email@example.com'
+        props['registry_credentials'] = {
+            'registry': registry,
+            'username': username,
+            'password': password,
+            'email': email
+        }
+        resource = docker_container.DockerContainer(
+            'Blog', definition.freeze(properties=props), self.stack)
+        docker_client = docker.Client()
+        self.m.StubOutWithMock(resource, 'get_client')
+        resource.get_client().MultipleTimes().AndReturn(
+            docker_client)
+        self.m.StubOutWithMock(docker_client, 'login')
+        docker_client.login(username=username, password=password,
+                            email=email, registry=registry)
+        self.assertIsNone(resource.validate())
+        self.m.ReplayAll()
+        scheduler.TaskRunner(resource.create)()
+        self.assertEqual((resource.CREATE, resource.COMPLETE),
+                         resource.state)
+        client = resource.get_client()
+        self.assertEqual(['samalba/wordpress'], client.pulled_images)
+
     @mock.patch.object(docker_container.DockerContainer, 'get_client')
     def test_create_failed(self, test_client):
         mock_client = mock.Mock()
