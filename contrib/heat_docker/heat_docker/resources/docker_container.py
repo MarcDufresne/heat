@@ -34,6 +34,7 @@ DOCKER_INSTALLED = False
 MIN_API_VERSION_MAP = {'read_only': '1.17', 'cpu_shares': '1.8',
                        'devices': '1.14', 'cpu_set': '1.12'}
 DEVICE_PATH_REGEX = r"^/dev/[/_\-a-zA-Z0-9]+$"
+VOLUME_PATH_REGEX = r'^/[/_\-a-zA-Z0-9]+$'
 # conditionally import so tests can work without having the dependency
 # satisfied
 try:
@@ -81,6 +82,12 @@ class DockerContainer(resource.Resource):
 
     _DEVICES_KEYS = (
         PATH_ON_HOST, PATH_IN_CONTAINER, PERMISSIONS
+    ) = (
+        'path_on_host', 'path_in_container', 'permissions'
+    )
+
+    _VOLUME_KEYS = (
+        HOST_PATH, CONTAINER_PATH, VOLUME_PERMISSIONS
     ) = (
         'path_on_host', 'path_in_container', 'permissions'
     )
@@ -178,9 +185,37 @@ class DockerContainer(resource.Resource):
             _('Image name.')
         ),
         VOLUMES: properties.Schema(
-            properties.Schema.MAP,
+            properties.Schema.LIST,
             _('Create a bind mount.'),
-            default={}
+            schema=properties.Schema(
+                properties.Schema.MAP,
+                _('Defines a volume, mount point and permissions'),
+                schema={
+                    HOST_PATH: properties.Schema(
+                        properties.Schema.STRING,
+                        _('Path to use on the host for the volume'),
+                        constraints=[
+                            constraints.AllowedPattern(VOLUME_PATH_REGEX)
+                        ]
+                    ),
+                    CONTAINER_PATH: properties.Schema(
+                        properties.Schema.STRING,
+                        _('Path where to mount the host volume'),
+                        constraints=[
+                            constraints.AllowedPattern(VOLUME_PATH_REGEX)
+                        ]
+                    ),
+                    VOLUME_PERMISSIONS: properties.Schema(
+                        properties.Schema.STRING,
+                        _('Permissions for the volume'),
+                        constraints=[
+                            constraints.AllowedValues(['rw', 'ro'])
+                        ],
+                        default='rw'
+                    )
+                }
+            ),
+            default=[]
         ),
         VOLUMES_FROM: properties.Schema(
             properties.Schema.LIST,
@@ -443,11 +478,15 @@ class DockerContainer(resource.Resource):
             'ports': self.properties[self.PORT_SPECS],
             'environment': self.properties[self.ENV],
             'dns': self.properties[self.DNS],
-            'volumes': self.properties[self.VOLUMES],
             'name': self.properties[self.NAME],
             'cpu_shares': self.properties[self.CPU_SHARES],
             'cpuset': self.properties[self.CPU_SET]
         }
+
+        container_volumes = [v[self.CONTAINER_PATH]
+                             for v in self.properties[self.VOLUMES]]
+        create_args['volumes'] = container_volumes
+
         client = self.get_client()
 
         registry_credentials = self.properties[self.REGISTRY_CREDENTIALS]
@@ -472,7 +511,10 @@ class DockerContainer(resource.Resource):
         if self.properties[self.PRIVILEGED]:
             start_args[self.PRIVILEGED] = True
         if self.properties[self.VOLUMES]:
-            start_args['binds'] = self.properties[self.VOLUMES]
+            start_args['binds'] = [
+                "{}:{}:{}".format(v[self.HOST_PATH], v[self.CONTAINER_PATH],
+                                  v[self.VOLUME_PERMISSIONS])
+                for v in self.properties[self.VOLUMES]]
         if self.properties[self.VOLUMES_FROM]:
             start_args['volumes_from'] = self.properties[self.VOLUMES_FROM]
         if self.properties[self.PORT_BINDINGS]:
