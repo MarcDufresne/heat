@@ -195,14 +195,16 @@ class DockerContainer(resource.Resource):
                         properties.Schema.STRING,
                         _('Path to use on the host for the volume'),
                         constraints=[
-                            constraints.AllowedPattern(VOLUME_PATH_REGEX)
+                            constraints.AllowedPattern(VOLUME_PATH_REGEX),
+                            constraints.Length(max=255)
                         ]
                     ),
                     CONTAINER_PATH: properties.Schema(
                         properties.Schema.STRING,
                         _('Path where to mount the host volume'),
                         constraints=[
-                            constraints.AllowedPattern(VOLUME_PATH_REGEX)
+                            constraints.AllowedPattern(VOLUME_PATH_REGEX),
+                            constraints.Length(max=255)
                         ]
                     ),
                     VOLUME_PERMISSIONS: properties.Schema(
