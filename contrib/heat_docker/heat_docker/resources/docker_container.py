@@ -34,7 +34,7 @@ DOCKER_INSTALLED = False
 MIN_API_VERSION_MAP = {'read_only': '1.17', 'cpu_shares': '1.8',
                        'devices': '1.14', 'cpu_set': '1.12'}
 DEVICE_PATH_REGEX = r"^/dev/[/_\-a-zA-Z0-9]+$"
-VOLUME_PATH_REGEX = r'^/[/_\-a-zA-Z0-9]+$'
+VOLUME_PATH_REGEX = r'^/[/_\-a-zA-Z0-9\.]+$'
 # conditionally import so tests can work without having the dependency
 # satisfied
 try:
