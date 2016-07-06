@@ -491,6 +491,16 @@ class DockerContainer(resource.Resource):
 
         client = self.get_client()
 
+        host_config_args = {}
+        if self.properties[self.VOLUMES]:
+            host_config_args['binds'] = [
+                "{}:{}:{}".format(v[self.HOST_PATH], v[self.CONTAINER_PATH],
+                                  v[self.VOLUME_PERMISSIONS])
+                for v in self.properties[self.VOLUMES]]
+
+        create_args['host_config'] = client.create_host_config(
+            **host_config_args)
+
         registry_credentials = self.properties[self.REGISTRY_CREDENTIALS]
 
         if registry_credentials:
@@ -512,11 +522,6 @@ class DockerContainer(resource.Resource):
 
         if self.properties[self.PRIVILEGED]:
             start_args[self.PRIVILEGED] = True
-        if self.properties[self.VOLUMES]:
-            start_args['binds'] = [
-                "{}:{}:{}".format(v[self.HOST_PATH], v[self.CONTAINER_PATH],
-                                  v[self.VOLUME_PERMISSIONS])
-                for v in self.properties[self.VOLUMES]]
         if self.properties[self.VOLUMES_FROM]:
             start_args['volumes_from'] = self.properties[self.VOLUMES_FROM]
         if self.properties[self.PORT_BINDINGS]:
